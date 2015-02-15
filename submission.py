@@ -53,7 +53,7 @@ class Submission:
         """Writes a Submission list to a database efficiently"""
         tuple_list = []
         for submission in submission_list:
-            tuple_list.append(submission.get_tuple)
+            tuple_list.append(submission.get_tuple())
 
         con = lite.connect(db_name)
 
