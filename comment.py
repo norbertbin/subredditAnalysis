@@ -23,7 +23,7 @@ class Comment:
     @classmethod
     def read_db(cls, db_name, row):
         """Creates a Comment by reading from a database"""
-        con = lite.connection(db_name)
+        con = lite.connect(db_name)
         
         with con:
             
@@ -34,7 +34,7 @@ class Comment:
         return cls(*com_tuple)
 
     @classmethod
-    def create_table(self, db_name):
+    def create_table(cls, db_name):
         """Creates a Comments table in a database if it does not exist"""
         con = lite.connect(db_name)
 
@@ -46,23 +46,23 @@ class Comment:
                         "num_comments INTEGER, text TEXT)")
 
     @classmethod
-    def write_db_list(comment_list, db_name):
+    def write_db_list(cls, comment_list, db_name):
         """Writes a Comment list to a database efficiently"""
         tuple_list = []
         for comment in comment_list:
             tuple_list.append(comment.get_tuple)
         
-        con = lite.connection(db_name)
+        con = lite.connect(db_name)
 
         with con:
 
             cur = con.cursor()
-            cur.execute("INSERT INTO Comments VALUES (?,?,?,?,?,?)",
+            cur.executemany("INSERT INTO Comments VALUES (?,?,?,?,?,?)",
                         tuple_list)
 
     def write_db(self, db_name):
         """Writes the Comment to a database"""
-        con = lite.connection(db_name)
+        con = lite.connect(db_name)
 
         with con:
 

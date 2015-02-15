@@ -37,30 +37,30 @@ class Submission:
         return cls(*sub_tuple)
 
     @classmethod
-    def create_table(self, db_name):
+    def create_table(cls, db_name):
         """Creates a Submissions table in a database"""
         con = lite.connect(db_name)
 
         with con:
             
             cur = con.cursor()
-            cur.execute("CREATE TABLE IF NOT EXISTS Submissions(sub_id TEXT, title TEXT, "
-            "author TEXT, created_utc INTEGER, score INTEGER, "
-            "num_comments INTEGER, text TEXT)")
+            cur.execute("CREATE TABLE IF NOT EXISTS Submissions(sub_id TEXT, "
+                        "title TEXT, author TEXT, created_utc INTEGER, "
+                        "score INTEGER, num_comments INTEGER, text TEXT)")
 
     @classmethod
-    def write_db_list(submission_list, db_name):
+    def write_db_list(cls, submission_list, db_name):
         """Writes a Submission list to a database efficiently"""
         tuple_list = []
         for submission in submission_list:
             tuple_list.append(submission.get_tuple)
 
-        con = lite.connection(db_name)
+        con = lite.connect(db_name)
 
         with con:
 
             cur = con.cursor()
-            cur.execute("INSERT INTO Submissions VALUES (?,?,?,?,?,?,?)", 
+            cur.executemany("INSERT INTO Submissions VALUES (?,?,?,?,?,?,?)", 
                         tuple_list)            
 
     def write_db(self, db_name):
