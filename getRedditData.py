@@ -52,6 +52,8 @@ while True:
             time.sleep(ERROR_SLEEP_TIME)
         else:
             raise NameError('MaxConnectionErrors')
+    except Exception as e:
+        print e.__doc__
 
 submission_list = []
 comment_list = []
@@ -73,7 +75,10 @@ while i < len(raw_submission_list):
             error_count += 1
             time.sleep(ERROR_SLEEP_TIME)
         else:
-            raise NameError('MaxConnectionErrors')            
+            raise NameError('MaxConnectionErrors')
+    except Exception as e:
+        print e.__doc__
+        i += 1 #try skiping this submission
 ###
 
 
