@@ -27,16 +27,20 @@ class Comment:
 
     @classmethod
     def read_db(cls, db_name, row):
-        """Creates a Comment by reading from a database"""
+        """Creates a Comment list by reading from a database"""
         con = lite.connect(db_name)
         
         with con:
             
             cur = con.cursor()
             cur.execute("SELECT * FROM Comments")
-            com_tuple = cur.fetchone()
+            com_tuple = cur.fetchall()
 
-        return cls(*com_tuple)
+        sub_list = []
+        for i in range(0, len(sub_tuple_list)):
+            sub_list[i] = cls(*sub_tuple_list[i])
+
+        return sub_list
 
     @classmethod
     def create_table(cls, db_name):

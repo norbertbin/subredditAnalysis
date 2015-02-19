@@ -24,17 +24,21 @@ class Submission:
                    raw_submission.selftext.encode('ascii', 'replace'))
 
     @classmethod
-    def read_db(cls, db_name, row):
-        """Creates a Submission by reading from a database"""
+    def read_db(cls, db_name):
+        """Creates a Submission list by reading from a database"""
         con = lite.connect(db_name)
 
         with con:
 
             cur = con.cursor()
             cur.execute("SELECT * FROM Submissions")
-            sub_tuple = cur.fetchone()
+            sub_tuple_list = cur.fetchall()
             
-        return cls(*sub_tuple)
+        sub_list = []
+        for i in range(0, len(sub_tuple_list)):
+            sub_list[i] = cls(*sub_tuple_list[i])
+
+        return sub_list
 
     @classmethod
     def create_table(cls, db_name):
