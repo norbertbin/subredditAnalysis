@@ -48,9 +48,9 @@ def get_text_data(db, table, col):
         text_data = cur.fetchall() #list of tuples
         text_data = strip_tuple(text_data)
         text_data = clean_text(text_data)
-        return(text_data)
+    return(text_data)
 
-def gen_DTM(text_data, vocab):
+def gen_dtm(text_data, vocab):
     """Creates document term count matrix"""
     vectorizer = sklearn.feature_extraction.text.CountVectorizer(
         vocabulary = vocab)
@@ -101,34 +101,76 @@ def remove_unused_words(text_list, vocab):
         tokens = [word for word in tokens if word in vocabset]
         text_list[i] = u' '.join(tokens)
     return text_list
+
+def create_vocab_table(db, vocab):
+    """Creates a table with vocab in db"""
+    con = lite.connect(db)
+    with con:
+        cur = con.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS Vocab(vocab TEXT)")
+    for i in range(0, len(vocab)):
+        vocab[i] = (vocab[i],)
+    with con:
+        cur = con.cursor()
+        cur.executemany("INSERT INTO Vocab VALUES (?)", vocab)
+    
+def get_user_and_text(db):
+    """Returns tuple with user name and comment text"""
+    con = lite.connect(db)
+    with con:
+        cur = con.cursor()
+        cur.execute("SELECT author, GROUP_CONCAT(text, ' ') FROM Comments GROUP BY author")
+        user_text_list = cur.fetchall()   
+    return user_text_list    
+
+def create_user_text_table(db, user_list, text_list):
+    """Creates a table with user name and their text"""
+    con = lite.connect(db)
+    with con:
+        cur = con.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS User(user TEXT, text TEXT)")
+    for i in range(0, len(user_list)):
+        user_list[i] = (user_list[i], text_list[i])
+    with con:
+        cur = con.cursor()
+        cur.executemany("INSERT INTO User VALUES (?,?)", user_list)
 ###
+
 
 ### process and save data
 # load data from database and do basic processing
 sub_text_list = get_text_data(DB_NAME, "Submissions", "text")
 com_text_list = get_text_data(DB_NAME, "Comments", "text")
 
+user_and_text_list = get_user_and_text(DB_NAME)
+user_list = strip_tuple(user_and_text_list, 0)
+user_text_list = clean_text(strip_tuple(user_and_text_list, 1))
+
 # get joint vocabulary for submissions and comments excluding low counts
 vocab = gen_vocab(sub_text_list + com_text_list, WORD_COUNT_CUTOFF, 
                   STOPWORDS)
 
 # generate document term matrices
-sub_dtm = gen_DTM(sub_text_list, vocab)
-com_dtm = gen_DTM(com_text_list, vocab)
+sub_dtm = gen_dtm(sub_text_list, vocab)
+user_dtm = gen_dtm(user_text_list, vocab)
 
 # filter unused words from text lists
 sub_text_list = remove_unused_words(sub_text_list, vocab)
 com_text_list = remove_unused_words(com_text_list, vocab)
+user_text_list = remove_unused_words(user_text_list, vocab)
 
 #save document term matrices 
 io.savemat(DTM_FILE, dict(sub_dtm = sub_dtm,
-                          com_dtm = com_dtm))
+                          user_dtm = user_dtm))
 
 # create submission and comment table if they do not exist in db
 Submission.create_table(PROC_DB_NAME)
 Comment.create_table(PROC_DB_NAME)
 
 #load processed data to a database for use in R
+create_vocab_table(PROC_DB_NAME, vocab)
+create_user_text_table(PROC_DB_NAME, user_list, user_text_list)
+
 gen_new_table(DB_NAME, PROC_DB_NAME, "Submissions", SUB_TEXT_INDEX, sub_text_list)
 gen_new_table(DB_NAME, PROC_DB_NAME, "Comments", COM_TEXT_INDEX, com_text_list)
 ###
