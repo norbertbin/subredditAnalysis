@@ -11,14 +11,14 @@ from comment import Comment
 
 
 ### define constants
-DB_NAME = "data/test_raw_subreddit.db"
-PROC_DB_NAME = "data/test_proc_subreddit.db"
+DB_NAME = "data/raw_subreddit.db"
+PROC_DB_NAME = "data/proc_subreddit.db"
 DTM_FILE = "data/dtm_subreddit.mat"
 COM_TEXT_INDEX = 7
 SUB_TEXT_INDEX = 6
 SUB_TITLE_INDEX = 1
 WORD_COUNT_CUTOFF = 10
-STOPWORDS = stopwords.words('english') + ['ive', 'k', 'th', 'm']
+STOPWORDS = stopwords.words('english') + ['ive', 'k', 'th', 'm', 'im', 'also']
 ###
 
 
@@ -30,13 +30,20 @@ def strip_tuple(tuple_list, tuple_index = 0):
         elem_list.append(tuple_list[i][tuple_index])
     return elem_list
 
+
+def xstr(s):
+    """If None convert to empty string"""
+    if s is None:
+        return u''
+    return s
+
 def clean_text(text_list):
     """Removes capitol letters and punctuation from list of text."""
     remove_char = u'!"#%\'()*+,-./:;<=>?@[\]^_`{|}~$1234567890'
     translate_table = dict((ord(char), None) for char in remove_char)
     translate_table[ord(u'\n')] = ord(' ')
     for i in range(0, len(text_list)):
-        text_list[i] = (text_list[i]).lower().translate(translate_table)
+        text_list[i] = (xstr(text_list[i])).lower().translate(translate_table)
     return text_list
 
 def get_text_data(db, table, col):
@@ -67,7 +74,7 @@ def replace_tuple(tuple_obj, replace_obj, replace_index):
     else:
         return tuple_obj[:replace_index] + (replace_obj,) + tuple_obj[replace_index+1:]
 
-def gen_new_table(db_old, db_new, table, col_index, new_col_list):
+def gen_new_table(db_old, db_new, table, col_index, new_col_list, ord_users, ord_subs):
     """Create a new table with new data in col_index"""
     con = lite.connect(db_old)
     with con:
@@ -76,6 +83,16 @@ def gen_new_table(db_old, db_new, table, col_index, new_col_list):
         tuple_list = cur.fetchall()
     for i in range(0, len(new_col_list)):
         tuple_list[i] = replace_tuple(tuple_list[i], new_col_list[i], col_index)
+    #anonymize username and submission id
+    if(table == "Comments"):
+        anon_users = anonymize(strip_tuple(tuple_list, 1), ord_users)
+        anon_subs = anonymize(strip_tuple(tuple_list, 5), ord_subs)
+        for i in range(0, len(new_col_list)):
+            tuple_list[i] = replace_tuple(tuple_list[i], anon_users[i], 1)
+            tuple_list[i] = replace_tuple(tuple_list[i], anon_subs[i], 5)
+    elif(table == "Submissions"):
+        for i in range(0, len(new_col_list)):
+            tuple_list[i] = replace_tuple(tuple_list[i], i, 0)
     num_bindings = len(tuple_list[0])
     bindings = ('?,' * num_bindings)[:-1]
     con = lite.connect(db_new)
@@ -129,11 +146,27 @@ def create_user_text_table(db, user_list, text_list):
     with con:
         cur = con.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS User(user TEXT, text TEXT)")
+    ut_list = []
     for i in range(0, len(user_list)):
-        user_list[i] = (user_list[i], text_list[i])
+        ut_list.append((i, text_list[i])) #use index for instead of username
     with con:
         cur = con.cursor()
-        cur.executemany("INSERT INTO User VALUES (?,?)", user_list)
+        cur.executemany("INSERT INTO User VALUES (?,?)", ut_list)
+
+def anonymize(labels, unique_ordered_labels):
+    """Renames labels using index of unique_ordered_labels"""
+    index_dict = dict((val, idx) for idx, val in enumerate(unique_ordered_labels))
+    return [index_dict[x] for x in labels]
+
+def get_sub_list(db):
+    """a"""
+    con = lite.connect(db)
+    with con:
+        cur = con.cursor()
+        cur.execute("SELECT sub_id FROM Submissions")
+        sub_list = cur.fetchall()   
+    return strip_tuple(sub_list)
+
 ###
 
 
@@ -145,6 +178,8 @@ com_text_list = get_text_data(DB_NAME, "Comments", "text")
 user_and_text_list = get_user_and_text(DB_NAME)
 user_list = strip_tuple(user_and_text_list, 0)
 user_text_list = clean_text(strip_tuple(user_and_text_list, 1))
+
+sub_list = get_sub_list(DB_NAME)
 
 # get joint vocabulary for submissions and comments excluding low counts
 vocab = gen_vocab(sub_text_list + com_text_list, WORD_COUNT_CUTOFF, 
@@ -171,8 +206,8 @@ Comment.create_table(PROC_DB_NAME)
 create_vocab_table(PROC_DB_NAME, vocab)
 create_user_text_table(PROC_DB_NAME, user_list, user_text_list)
 
-gen_new_table(DB_NAME, PROC_DB_NAME, "Submissions", SUB_TEXT_INDEX, sub_text_list)
-gen_new_table(DB_NAME, PROC_DB_NAME, "Comments", COM_TEXT_INDEX, com_text_list)
+gen_new_table(DB_NAME, PROC_DB_NAME, "Submissions", SUB_TEXT_INDEX, sub_text_list, user_list, sub_list)
+gen_new_table(DB_NAME, PROC_DB_NAME, "Comments", COM_TEXT_INDEX, com_text_list, user_list, sub_list)
 ###
 
 
